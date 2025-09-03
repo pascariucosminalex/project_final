@@ -5,7 +5,7 @@ on:
     branches: [ "main", "dev" ]
 
 env:
-  MONGODB_DB_NAME: gha-demo
+  MONGODB_DB_NAME: db1
   PORT: 8080
 
 jobs:
@@ -45,7 +45,6 @@ jobs:
 
       - name: Ensure coverage dir exists
         run: mkdir -p coverage
-       
 
       - name: Upload test coverage
         uses: actions/upload-artifact@v4
@@ -141,11 +140,83 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} \
             "echo ✅ Connected to $(hostname) && docker ps -a || true"
 
+  docker-smoketest:
+    name: Run Docker Smoke Test (local check)
+    runs-on: ubuntu-latest
+    needs: [docker, test]
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      # Setează TAG din jobul 'test' și eșuează explicit dacă e gol
+      - name: Set TAG
+        run: |
+          TAG="${{ needs.test.outputs.short_sha }}"
+          echo "Using TAG: $TAG"
+          if [ -z "$TAG" ]; then
+            echo "❌ TAG is empty (needs.test.outputs.short_sha)"; exit 1
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Pull images
+        run: |
+          docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
+
+      - name: Start containers
+        env:
+          # var env ale app-ului pentru smoke
+          MONGODB_CONNECTION_PROTOCOL: mongodb+srv
+          MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+        run: |
+          docker network create appnet || true
+
+          docker run -d --name app --network appnet \
+            -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
+            -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
+            -e MONGODB_PASSWORD="${MONGODB_PASSWORD}" \
+            -e MONGODB_CLUSTER_ADDRESS="${MONGODB_CLUSTER_ADDRESS}" \
+            -e MONGODB_DB_NAME='${{ env.MONGODB_DB_NAME }}' \
+            -e PORT='${{ env.PORT }}' \
+            -p 8080:8080 \
+            ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
+
+          docker run -d --name nginx --network appnet \
+            -p 8081:80 \
+            ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
+
+      - name: Wait 60s and check status
+        run: |
+          echo "⏳ Aștept 60s să pornească aplicațiile..."
+          sleep 60
+          echo "== docker ps =="
+          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+
+          bad=$(docker ps --format '{{.Names}} {{.Status}}' | grep -i "Restarting" || true)
+          if [ -n "$bad" ]; then
+            echo "❌ Un container e în restart:"
+            echo "$bad"
+            exit 1
+          else
+            echo "✅ Toate containerele rulează OK"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f app nginx || true
+          docker network rm appnet || true
+
   report:
     name: CI Summary & Failures
     runs-on: ubuntu-latest
-    needs: [test, docker, trivy-scan, ssh-smoketest]
-    if: always()  # rulează chiar dacă un job anterior a eșuat
+    needs: [test, docker, trivy-scan, ssh-smoketest, docker-smoketest]
+    if: always()
     steps:
       - name: Build failure report
         uses: actions/github-script@v7
@@ -161,7 +232,7 @@ jobs:
 
             const jobs = (data.jobs || []).map(j => ({
               name: j.name,
-              conclusion: j.conclusion,   // success | failure | cancelled | timed_out | null
+              conclusion: j.conclusion,
               status: j.status,
               html_url: j.html_url,
               steps: (j.steps || []).filter(s => s.conclusion === 'failure')
@@ -179,64 +250,6 @@ jobs:
 
             await core.summary.addRaw(md).write();
             if (failed.length) core.setFailed(`${failed.length} job(s) failed`);
-            
-            
-  docker-smoketest:
-    name: Run Docker Smoke Test (local check)
-    runs-on: ubuntu-latest
-    needs: docker
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
-
-      - name: Pull images
-        run: |
-          docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.docker.outputs.short_sha }}
-          docker pull ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.docker.outputs.short_sha }}
-
-      - name: Start containers
-        run: |
-          docker network create appnet || true
-          docker run -d --name app --network appnet \
-            -e MONGODB_CONNECTION_PROTOCOL=mongodb+srv \
-            -e MONGODB_USERNAME=${{ secrets.MONGODB_USERNAME }} \
-            -e MONGODB_PASSWORD=${{ secrets.MONGODB_PASSWORD }} \
-            -e MONGODB_CLUSTER_ADDRESS=${{ secrets.MONGODB_CLUSTER_ADDRESS }} \
-            -e MONGODB_DB_NAME=${{ env.MONGODB_DB_NAME }} \
-            -e PORT=${{ env.PORT }} \
-            -p 8080:8080 \
-            ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.test.outputs.short_sha }}
-
-          docker run -d --name nginx --network appnet \
-            -p 8081:80 \
-            ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }}
-
-      - name: Wait 60s and check status
-        run: |
-          echo "⏳ Aștept 60s să pornească aplicațiile..."
-          sleep 60
-          echo "== docker ps =="
-          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
-
-          # verifică dacă vreun container are status "Restarting"
-          bad=$(docker ps --format '{{.Names}} {{.Status}}' | grep -i "Restarting" || true)
-          if [ -n "$bad" ]; then
-            echo "❌ Un container e în restart:"
-            echo "$bad"
-            exit 1
-          else
-            echo "✅ Toate containerele rulează OK"
-          fi
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker rm -f app nginx || true
-          docker network rm appnet || true
-
 
   approve-deploy:
     name: Approve Deploy to Production
