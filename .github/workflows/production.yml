@@ -14,7 +14,8 @@ on:
 env:
   APP_PORT: 5001
   NGINX_PORT: 80
-  MONGODB_DB_NAME: db1  # numele bazei
+  MONGODB_DB_NAME: db1
+  MONGODB_CONNECTION_PROTOCOL: mongodb+srv
 
 jobs:
   deploy:
