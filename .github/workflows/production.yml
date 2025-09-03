@@ -58,6 +58,7 @@ jobs:
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS }}
+          MONGODB_CONNECTION_PROTOCOL: ${{ env.MONGODB_CONNECTION_PROTOCOL }}
           MONGODB_DB_NAME: ${{ env.MONGODB_DB_NAME }}
           APP_PORT: ${{ env.APP_PORT }}
           NGINX_PORT: ${{ env.NGINX_PORT }}
@@ -94,13 +95,17 @@ jobs:
           for v in MONGODB_USERNAME MONGODB_PASSWORD MONGODB_CLUSTER_ADDRESS MONGODB_DB_NAME; do
             if [ -z "${!v:-}" ]; then echo "❌ Missing $v"; exit 1; else echo "✅ $v set"; fi
           done
-
-          echo "== start app (${APP_PORT}) =="
-          docker run -d --name app --restart=always --network appnet \
-            -e MONGODB_URI="mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_CLUSTER_ADDRESS}/${MONGODB_DB_NAME}?retryWrites=true&w=majority" \
+            echo "== start app (${APP_PORT}) =="
+            docker run -d --name app --restart=always --network appnet \
+            -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
+            -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
+            -e MONGODB_PASSWORD="${MONGODB_PASSWORD}" \
+            -e MONGODB_CLUSTER_ADDRESS="${MONGODB_CLUSTER_ADDRESS}" \
+            -e MONGODB_DB_NAME="${MONGODB_DB_NAME}" \
             -e PORT="${APP_PORT}" \
             -p ${APP_PORT}:${APP_PORT} \
             ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
+
 
           echo "== start nginx (:80 -> app:${APP_PORT}) =="
           docker run -d --name nginx --restart=always --network appnet \
