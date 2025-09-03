@@ -46,6 +46,10 @@ jobs:
         with:
           name: test-coverage
           path: coverage/
+      - name: Set short SHA
+        id: vars
+        run: echo "SHORT_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
+    
 
   build-image:
     name: Build Docker Image
@@ -60,6 +64,7 @@ jobs:
           docker build -f docker/Dockerfile.app -t myapp:ci .
 
   trivy-scan:
+
     name: Scan Image with Trivy
     runs-on: ubuntu-latest
     needs: build-image
@@ -94,16 +99,16 @@ jobs:
 
       - name: Build App Image
         run: |
-          docker build -f docker/Dockerfile.app -t ${{ secrets.DOCKER_USERNAME }}/myapp:latest .
+          docker build -f docker/Dockerfile.app -t ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA} .
 
       - name: Build Nginx Image
         run: |
-          docker build -f docker/Dockerfile.nginx -t ${{ secrets.DOCKER_USERNAME }}/mynginx:latest .
+            docker build -f docker/Dockerfile.nginx -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA} .
 
       - name: Push Images
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/mynginx:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA}
+          docker push ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA}
 
   approve-deploy:
     name: Approve Deploy to Production
