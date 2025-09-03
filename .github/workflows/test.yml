@@ -1,0 +1,115 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+
+env:
+  MONGODB_DB_NAME: gha-demo
+  PORT: 8080
+
+jobs:
+  test:
+    name: Run Tests with MongoDB
+    runs-on: ubuntu-latest
+    env:
+      MONGODB_CONNECTION_PROTOCOL: mongodb+srv
+      MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS }}
+      MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+      MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: node-deps-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start server
+        run: |
+          npm start &
+          npx wait-on http://127.0.0.1:$PORT
+
+      - name: Run tests
+        run: npm test -- --coverage
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage
+          path: coverage/
+
+  build-image:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        run: |
+          docker build -f docker/Dockerfile.app -t myapp:ci .
+
+  trivy-scan:
+    name: Scan Image with Trivy
+    runs-on: ubuntu-latest
+    needs: build-image
+    steps:
+      - name: Install Trivy
+        uses: aquasecurity/trivy-action@v0.13.1
+        with:
+          image-ref: myapp:ci
+          format: 'table'
+          exit-code: '0'
+          output: 'trivy-report.txt'
+
+      - name: Upload Trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+
+  docker:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: trivy-scan
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build App Image
+        run: |
+          docker build -f docker/Dockerfile.app -t ${{ secrets.DOCKER_USERNAME }}/myapp:latest .
+
+      - name: Build Nginx Image
+        run: |
+          docker build -f docker/Dockerfile.nginx -t ${{ secrets.DOCKER_USERNAME }}/mynginx:latest .
+
+      - name: Push Images
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/mynginx:latest
+
+  approve-deploy:
+    name: Approve Deploy to Production
+    runs-on: ubuntu-latest
+    needs: docker
+    environment:
+      name: production
+      deployment_branch_policy:
+        protected_branches: true
+    steps:
+      - name: Await manual approval
+        run: echo "✅ CI complete. Waiting for manual approval to deploy to production..."
