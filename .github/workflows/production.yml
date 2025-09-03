@@ -56,7 +56,7 @@ jobs:
           # Mongo (folosește exact aceste nume de secrete)
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
-          MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS_PROD }}
+          MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS }}
           MONGODB_DB_NAME: ${{ env.MONGODB_DB_NAME }}
           APP_PORT: ${{ env.APP_PORT }}
           NGINX_PORT: ${{ env.NGINX_PORT }}
