@@ -2,7 +2,7 @@ name: Production
 
 on:
   workflow_run:
-    workflows: ["CI Pipeline"]
+    workflows: ["Test Pipline"]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -14,7 +14,7 @@ on:
 env:
   APP_PORT: 5001
   NGINX_PORT: 80
-  MONGODB_DB_NAME: db1
+  MONGODB_DB_NAME: db1  # numele bazei
 
 jobs:
   deploy:
@@ -51,24 +51,24 @@ jobs:
       - name: Deploy over SSH (docker pull & run)
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}   # <-- folosește tokenul
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
-          MONGODB_CONNECTION_PROTOCOL: mongodb+srv
+          # Mongo (folosește exact aceste nume de secrete)
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS_PROD }}
-          MONGODB_USERNAME: ${{ secrets.USER_PRODUCTION }}
-          MONGODB_PASSWORD: ${{ secrets.PASS_PRODUCTION }}
           MONGODB_DB_NAME: ${{ env.MONGODB_DB_NAME }}
           APP_PORT: ${{ env.APP_PORT }}
           NGINX_PORT: ${{ env.NGINX_PORT }}
         run: |
+          # Injectăm variabilele ca ENV în sesiunea SSH și rulăm scriptul pe VM
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} \
             "DOCKER_USERNAME='${DOCKER_USERNAME}' \
              DOCKER_TOKEN='${DOCKER_TOKEN}' \
              IMAGE_TAG='${IMAGE_TAG}' \
-             MONGODB_CONNECTION_PROTOCOL='${MONGODB_CONNECTION_PROTOCOL}' \
-             MONGODB_CLUSTER_ADDRESS='${MONGODB_CLUSTER_ADDRESS}' \
              MONGODB_USERNAME='${MONGODB_USERNAME}' \
              MONGODB_PASSWORD='${MONGODB_PASSWORD}' \
+             MONGODB_CLUSTER_ADDRESS='${MONGODB_CLUSTER_ADDRESS}' \
              MONGODB_DB_NAME='${MONGODB_DB_NAME}' \
              APP_PORT='${APP_PORT}' \
              NGINX_PORT='${NGINX_PORT}' \
@@ -89,13 +89,14 @@ jobs:
           docker rm -f app || true
           docker rm -f nginx || true
 
+          echo "== sanity check Mongo env =="
+          for v in MONGODB_USERNAME MONGODB_PASSWORD MONGODB_CLUSTER_ADDRESS MONGODB_DB_NAME; do
+            if [ -z "${!v:-}" ]; then echo "❌ Missing $v"; exit 1; else echo "✅ $v set"; fi
+          done
+
           echo "== start app (${APP_PORT}) =="
           docker run -d --name app --restart=always --network appnet \
-            -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
-            -e MONGODB_CLUSTER_ADDRESS="${MONGODB_CLUSTER_ADDRESS}" \
-            -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
-            -e MONGODB_PASSWORD="${MONGODB_PASSWORD}" \
-            -e MONGODB_DB_NAME="${MONGODB_DB_NAME}" \
+            -e MONGODB_URI="mongodb+srv://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_CLUSTER_ADDRESS}/${MONGODB_DB_NAME}?retryWrites=true&w=majority" \
             -e PORT="${APP_PORT}" \
             -p ${APP_PORT}:${APP_PORT} \
             ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
