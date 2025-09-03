@@ -1,0 +1,94 @@
+name: Production
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag-ul imaginii (ex: SHORT_SHA; dacă lipsește, folosește head_sha din CI)"
+        required: false
+        type: string
+
+env:
+  APP_PORT: 5001
+  NGINX_PORT: 80
+  MONGODB_DB_NAME: db1
+
+jobs:
+  deploy:
+    name: Deploy to Production (SSH)
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    environment: production
+
+    steps:
+      - name: Determine image TAG
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+            TAG="${SHA::6}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using image tag: $TAG"
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRODUCTION }}
+
+      - name: Deploy over SSH
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
+          MONGODB_CONNECTION_PROTOCOL: mongodb+srv
+          MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS_PROD }}
+          MONGODB_USERNAME: ${{ secrets.USER_PRODUCTION }}
+          MONGODB_PASSWORD: ${{ secrets.PASS_PRODUCTION }}
+          MONGODB_DB_NAME: ${{ env.MONGODB_DB_NAME }}
+          APP_PORT: ${{ env.APP_PORT }}
+          NGINX_PORT: ${{ env.NGINX_PORT }}
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} << 'EOF'
+          set -euo pipefail
+          echo "== docker login =="
+          echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+
+          echo "== create network =="
+          docker network create appnet || true
+
+          echo "== pull images =="
+          docker pull ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
+          docker pull ${DOCKER_USERNAME}/mynginx:${IMAGE_TAG}
+
+          echo "== stop old containers =="
+          docker rm -f app || true
+          docker rm -f nginx || true
+
+          echo "== start app =="
+          docker run -d --name app --restart=always --network appnet \
+            -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
+            -e MONGODB_CLUSTER_ADDRESS="${MONGODB_CLUSTER_ADDRESS}" \
+            -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
+            -e MONGODB_PASSWORD="${MONGODB_PASSWORD}" \
+            -e MONGODB_DB_NAME="${MONGODB_DB_NAME}" \
+            -e PORT="${APP_PORT}" \
+            -p ${APP_PORT}:${APP_PORT} \
+            ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
+
+          echo "== start nginx (proxy :80 -> app:${APP_PORT}) =="
+          docker run -d --name nginx --restart=always --network appnet \
+            -p ${NGINX_PORT}:80 \
+            ${DOCKER_USERNAME}/mynginx:${IMAGE_TAG}
+
+          echo "✅ Deploy OK - tag ${IMAGE_TAG}"
+          EOF
