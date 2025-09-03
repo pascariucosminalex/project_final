@@ -43,14 +43,16 @@ jobs:
       - name: Run Playwright tests
         run: npm test
 
-      - name: Ensure coverage dir exists (optional)
+      - name: Ensure coverage dir exists
         run: mkdir -p coverage
+       
 
       - name: Upload test coverage
         uses: actions/upload-artifact@v4
         with:
           name: test-coverage
           path: coverage/
+          if-no-files-found: ignore
 
       - name: Compute SHORT_SHA
         id: sha
