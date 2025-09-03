@@ -164,8 +164,8 @@ jobs:
 
       - name: Pull images
         run: |
-          docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${IMAGE_TAG}
-          docker pull ${{ secrets.DOCKER_USERNAME }}/mynginx:${IMAGE_TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
 
       - name: Start containers
         env:
@@ -185,11 +185,11 @@ jobs:
             -e MONGODB_DB_NAME='${{ env.MONGODB_DB_NAME }}' \
             -e PORT='${{ env.PORT }}' \
             -p 8080:8080 \
-            ${{ secrets.DOCKER_USERNAME }}/myapp:${IMAGE_TAG}
+            ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
 
           docker run -d --name nginx --network appnet \
             -p 8081:80 \
-            ${{ secrets.DOCKER_USERNAME }}/mynginx:${IMAGE_TAG}
+            ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
 
       - name: Wait 60s and check status
         run: |
