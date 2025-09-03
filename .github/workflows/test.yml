@@ -153,14 +153,14 @@ jobs:
 
       # Setează TAG din jobul 'test' și eșuează explicit dacă e gol
       - name: Set TAG
-       run: |
-        TAG="${{ needs.test.outputs.short_sha }}"
-        if [ -z "$TAG" ]; then
+        run: |
+          TAG="${{ needs.test.outputs.short_sha }}"
+          if [ -z "$TAG" ]; then
           echo "ℹ️ needs.test.outputs.short_sha e gol; fallback la GITHUB_SHA"
           TAG="${GITHUB_SHA:0:6}"
-        fi
-        echo "Using TAG: $TAG"
-        echo "TAG=$TAG" >> "$GITHUB_ENV"
+          fi
+          echo "Using TAG: $TAG"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
 
 
       - name: Pull images
