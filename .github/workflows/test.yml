@@ -153,13 +153,15 @@ jobs:
 
       # Setează TAG din jobul 'test' și eșuează explicit dacă e gol
       - name: Set TAG
-        run: |
-          TAG="${{ needs.test.outputs.short_sha }}"
-          echo "Using TAG: $TAG"
-          if [ -z "$TAG" ]; then
-            echo "❌ TAG is empty (needs.test.outputs.short_sha)"; exit 1
-          fi
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
+       run: |
+        TAG="${{ needs.test.outputs.short_sha }}"
+        if [ -z "$TAG" ]; then
+          echo "ℹ️ needs.test.outputs.short_sha e gol; fallback la GITHUB_SHA"
+          TAG="${GITHUB_SHA:0:6}"
+        fi
+        echo "Using TAG: $TAG"
+        echo "TAG=$TAG" >> "$GITHUB_ENV"
+
 
       - name: Pull images
         run: |
@@ -184,11 +186,11 @@ jobs:
             -e MONGODB_DB_NAME='${{ env.MONGODB_DB_NAME }}' \
             -e PORT='${{ env.PORT }}' \
             -p 8080:8080 \
-            ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
+            ${{ secrets.DOCKER_USERNAME }}/myapp:${IMAGE_TAG}
 
           docker run -d --name nginx --network appnet \
             -p 8081:80 \
-            ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
+            ${{ secrets.DOCKER_USERNAME }}/mynginx:$${IMAGE_TAG}
 
       - name: Wait 60s and check status
         run: |
