@@ -190,7 +190,7 @@ jobs:
 
           docker run -d --name nginx --network appnet \
             -p 8081:80 \
-            ${{ secrets.DOCKER_USERNAME }}/mynginx:$${IMAGE_TAG}
+            ${{ secrets.DOCKER_USERNAME }}/mynginx:${IMAGE_TAG}
 
       - name: Wait 60s and check status
         run: |
