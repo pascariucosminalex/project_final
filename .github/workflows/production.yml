@@ -54,20 +54,19 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
-          # Mongo (folosește exact aceste nume de secrete)
+          MONGODB_CONNECTION_PROTOCOL: ${{ env.MONGODB_CONNECTION_PROTOCOL }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS }}
-          MONGODB_CONNECTION_PROTOCOL: ${{ env.MONGODB_CONNECTION_PROTOCOL }}
           MONGODB_DB_NAME: ${{ env.MONGODB_DB_NAME }}
           APP_PORT: ${{ env.APP_PORT }}
           NGINX_PORT: ${{ env.NGINX_PORT }}
         run: |
-          # Injectăm variabilele ca ENV în sesiunea SSH și rulăm scriptul pe VM
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} \
             "DOCKER_USERNAME='${DOCKER_USERNAME}' \
              DOCKER_TOKEN='${DOCKER_TOKEN}' \
              IMAGE_TAG='${IMAGE_TAG}' \
+             MONGODB_CONNECTION_PROTOCOL='${MONGODB_CONNECTION_PROTOCOL}' \
              MONGODB_USERNAME='${MONGODB_USERNAME}' \
              MONGODB_PASSWORD='${MONGODB_PASSWORD}' \
              MONGODB_CLUSTER_ADDRESS='${MONGODB_CLUSTER_ADDRESS}' \
@@ -92,11 +91,12 @@ jobs:
           docker rm -f nginx || true
 
           echo "== sanity check Mongo env =="
-          for v in MONGODB_USERNAME MONGODB_PASSWORD MONGODB_CLUSTER_ADDRESS MONGODB_DB_NAME; do
+          for v in MONGODB_CONNECTION_PROTOCOL MONGODB_USERNAME MONGODB_PASSWORD MONGODB_CLUSTER_ADDRESS MONGODB_DB_NAME; do
             if [ -z "${!v:-}" ]; then echo "❌ Missing $v"; exit 1; else echo "✅ $v set"; fi
           done
-            echo "== start app (${APP_PORT}) =="
-            docker run -d --name app --restart=always --network appnet \
+
+          echo "== start app (${APP_PORT}) =="
+          docker run -d --name app --restart=always --network appnet \
             -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
             -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
             -e MONGODB_PASSWORD="${MONGODB_PASSWORD}" \
@@ -106,13 +106,7 @@ jobs:
             -p ${APP_PORT}:${APP_PORT} \
             ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
 
-
           echo "== start nginx (:80 -> app:${APP_PORT}) =="
           docker run -d --name nginx --restart=always --network appnet \
             -p ${NGINX_PORT}:80 \
             ${DOCKER_USERNAME}/mynginx:${IMAGE_TAG}
-
-          echo "== health check =="
-          sleep 3
-          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
-          EOF
