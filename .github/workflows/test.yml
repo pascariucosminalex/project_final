@@ -163,8 +163,8 @@ jobs:
 
       - name: Pull images
         run: |
-          docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
-          docker pull ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/myapp:${IMAGE_TAG}
+          docker pull ${{ secrets.DOCKER_USERNAME }}/mynginx:${IMAGE_TAG}
 
       - name: Start containers
         env:
