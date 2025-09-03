@@ -1,3 +1,4 @@
+# .github/workflows/test.yml
 name: CI Pipeline
 
 on:
@@ -34,43 +35,32 @@ jobs:
         run: |
           npm start &
           npx wait-on http://127.0.0.1:$PORT
- 
-      - name: Install Playwright dependencies
+
+      - name: Install Playwright browsers
         run: npx playwright install
 
       - name: Run Playwright tests
         run: npm test
+
+      - name: Ensure coverage dir exists (optional)
+        run: mkdir -p coverage
 
       - name: Upload test coverage
         uses: actions/upload-artifact@v4
         with:
           name: test-coverage
           path: coverage/
-      - name: Set short SHA
-        id: vars
-        run: echo "SHORT_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
-    
 
-  build-image:
-    name: Build Docker Image
+  docker:
+    name: Build & Push Docker Images
     runs-on: ubuntu-latest
     needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-     # - name: Build image for scanning
-     #   run: |
-     #     docker build -f docker/Dockerfile.app -t myapp:ci .
-
-
-  docker:
-    name: Build & Push Docker Images
-    runs-on: ubuntu-latest
-    needs: trivy-scan
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -78,13 +68,15 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # Build app (context: repo root, Dockerfile: docker/Dockerfile.app)
       - name: Build App Image
         run: |
           docker build -f docker/Dockerfile.app -t ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA} .
 
+      # Build nginx (context: docker/, Dockerfile: docker/Dockerfile.nginx)
       - name: Build Nginx Image
         run: |
-            docker build -f docker/Dockerfile.nginx -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA} .
+          docker build -f docker/Dockerfile.nginx -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA} docker
 
       - name: Push Images
         run: |
@@ -92,30 +84,52 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA}
 
   trivy-scan:
-
-    name: Scan Image with Trivy
+    name: Scan Images with Trivy (from Docker Hub)
     runs-on: ubuntu-latest
-    needs: build-image
+    needs: docker
     steps:
-      - name: Install Trivy
-        uses: aquasecurity/trivy-action@0.33.0
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
+
+      # dacă repo-urile Docker Hub sunt private, păstrează login
+      - name: Login to Docker Hub (for private images)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Trivy scan (app)
+        uses: aquasecurity/trivy-action@v0.20.0
         with:
           image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA}
-          format: 'table'
-          exit-code: '0'
-          output: 'trivy-report.txt'
+          format: table
+          output: trivy-app.txt
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'   # pune '1' ca să blochezi pipeline-ul pe vulnerabilități
 
-      - name: Upload Trivy report
+      - name: Trivy scan (nginx)
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA}
+          format: table
+          output: trivy-nginx.txt
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy reports
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-report
-          path: trivy-report.txt
-
+          name: trivy-reports
+          path: |
+            trivy-app.txt
+            trivy-nginx.txt
 
   approve-deploy:
     name: Approve Deploy to Production
     runs-on: ubuntu-latest
-    needs: docker
+    needs: trivy-scan
     environment: production
     steps:
       - name: Await manual approval
