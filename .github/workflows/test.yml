@@ -59,9 +59,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build image for scanning
-        run: |
-          docker build -f docker/Dockerfile.app -t myapp:ci .
+     # - name: Build image for scanning
+     #   run: |
+     #     docker build -f docker/Dockerfile.app -t myapp:ci .
 
   trivy-scan:
 
@@ -72,7 +72,7 @@ jobs:
       - name: Install Trivy
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: myapp:ci
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA}
           format: 'table'
           exit-code: '0'
           output: 'trivy-report.txt'
