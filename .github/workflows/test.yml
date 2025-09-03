@@ -151,7 +151,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      # Setează TAG din jobul 'test' și eșuează explicit dacă e gol
+
       - name: Set TAG
         run: |
           TAG="${{ needs.test.outputs.short_sha }}"
@@ -161,7 +161,6 @@ jobs:
           fi
           echo "Using TAG: $TAG"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
-
 
       - name: Pull images
         run: |
