@@ -51,7 +51,7 @@ jobs:
       - name: Deploy over SSH (docker pull & run)
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_TOKEN }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}   # <-- folosește tokenul
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
           MONGODB_CONNECTION_PROTOCOL: mongodb+srv
           MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS_PROD }}
@@ -61,10 +61,9 @@ jobs:
           APP_PORT: ${{ env.APP_PORT }}
           NGINX_PORT: ${{ env.NGINX_PORT }}
         run: |
-          # Transmitem variabilele ca ENV în sesiunea SSH și rulăm scriptul pe VM
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} \
             "DOCKER_USERNAME='${DOCKER_USERNAME}' \
-             DOCKER_TOKEN='${DOCKER_PASSWORD}' \
+             DOCKER_TOKEN='${DOCKER_TOKEN}' \
              IMAGE_TAG='${IMAGE_TAG}' \
              MONGODB_CONNECTION_PROTOCOL='${MONGODB_CONNECTION_PROTOCOL}' \
              MONGODB_CLUSTER_ADDRESS='${MONGODB_CLUSTER_ADDRESS}' \
@@ -77,7 +76,7 @@ jobs:
           set -euo pipefail
 
           echo "== docker login =="
-          echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+          echo "${DOCKER_TOKEN}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
 
           echo "== create network =="
           docker network create appnet || true

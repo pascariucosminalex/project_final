@@ -141,6 +141,46 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} \
             "echo ✅ Connected to $(hostname) && docker ps -a || true"
 
+  report:
+    name: CI Summary & Failures
+    runs-on: ubuntu-latest
+    needs: [test, docker, trivy-scan, ssh-smoketest]
+    if: always()  # rulează chiar dacă un job anterior a eșuat
+    steps:
+      - name: Build failure report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run_id = context.runId;
+            const { data } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id,
+              per_page: 100,
+            });
+
+            const jobs = (data.jobs || []).map(j => ({
+              name: j.name,
+              conclusion: j.conclusion,   // success | failure | cancelled | timed_out | null
+              status: j.status,
+              html_url: j.html_url,
+              steps: (j.steps || []).filter(s => s.conclusion === 'failure')
+                     .map(s => `#${s.number}: ${s.name}`)
+            }));
+
+            let md = `## CI Summary (run ${run_id})\n\n`;
+            for (const j of jobs) {
+              md += `- **${j.name}** → **${j.conclusion ?? j.status}** [logs](${j.html_url})\n`;
+              for (const s of j.steps) md += `  - ❌ Step ${s}\n`;
+            }
+
+            const failed = jobs.filter(j => ['failure','cancelled','timed_out'].includes(j.conclusion));
+            md += `\n${failed.length ? '### ❗ Rezultat\n' + failed.length + ' job(uri) au eșuat.' : '### ✅ Rezultat\nToate joburile au trecut.'}`;
+
+            await core.summary.addRaw(md).write();
+            if (failed.length) core.setFailed(`${failed.length} job(s) failed`);
+
+
   approve-deploy:
     name: Approve Deploy to Production
     runs-on: ubuntu-latest
