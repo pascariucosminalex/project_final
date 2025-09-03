@@ -1,4 +1,3 @@
-# .github/workflows/test.yml
 name: CI Pipeline
 
 on:
@@ -18,6 +17,8 @@ jobs:
       MONGODB_CLUSTER_ADDRESS: ${{ secrets.MONGODB_CLUSTER_ADDRESS }}
       MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
       MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+    outputs:
+      short_sha: ${{ steps.sha.outputs.short_sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,6 +52,10 @@ jobs:
           name: test-coverage
           path: coverage/
 
+      - name: Compute SHORT_SHA
+        id: sha
+        run: echo "short_sha=${GITHUB_SHA::6}" >> "$GITHUB_OUTPUT"
+
   docker:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
@@ -59,39 +64,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build app (context: repo root, Dockerfile: docker/Dockerfile.app)
       - name: Build App Image
         run: |
-          docker build -f docker/Dockerfile.app -t ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA} .
+          docker build -f docker/Dockerfile.app \
+            -t ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.test.outputs.short_sha }} .
 
-      # Build nginx (context: docker/, Dockerfile: docker/Dockerfile.nginx)
       - name: Build Nginx Image
         run: |
-          docker build -f docker/Dockerfile.nginx -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA} docker
+          docker build -f docker/Dockerfile.nginx \
+            -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }} docker
 
       - name: Push Images
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA}
-          docker push ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA}
+          docker push ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.test.outputs.short_sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }}
 
   trivy-scan:
     name: Scan Images with Trivy (from Docker Hub)
     runs-on: ubuntu-latest
-    needs: docker
+    needs: [docker, test]
     steps:
-      - name: Set short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::6}" >> $GITHUB_ENV
-
-      # dacă repo-urile Docker Hub sunt private, păstrează login
       - name: Login to Docker Hub (for private images)
         uses: docker/login-action@v3
         with:
@@ -101,17 +99,17 @@ jobs:
       - name: Trivy scan (app)
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${SHORT_SHA}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.test.outputs.short_sha }}
           format: table
           output: trivy-app.txt
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '0'   # pune '1' ca să blochezi pipeline-ul pe vulnerabilități
+          exit-code: '0'  
 
       - name: Trivy scan (nginx)
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }}
           format: table
           output: trivy-nginx.txt
           severity: CRITICAL,HIGH
