@@ -109,7 +109,7 @@ jobs:
           exit-code: '0'   # pune '1' ca să blochezi pipeline-ul pe vulnerabilități
 
       - name: Trivy scan (nginx)
-        uses: quasecurity/trivy-action@0.33.0
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${SHORT_SHA}
           format: table
