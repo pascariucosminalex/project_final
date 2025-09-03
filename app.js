@@ -1,12 +1,12 @@
-import bodyParser from 'body-parser';
 import express from 'express';
 
-import eventRoutes from './routes/events.js';
-
 const app = express();
+const port = process.env.PORT || 8080;
 
-app.use(bodyParser.json());
+app.get('/', (req, res) => {
+  res.send('salut din pipeline');
+});
 
-app.use(eventRoutes);
-
-app.listen(process.env.PORT);
+app.listen(port, () => {
+  console.log(`✅ Server pornit pe http://localhost:${port}`);
+});
