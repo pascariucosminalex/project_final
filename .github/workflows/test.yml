@@ -104,7 +104,7 @@ jobs:
           output: trivy-app.txt
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '0'  
+          exit-code: '0'
 
       - name: Trivy scan (nginx)
         uses: aquasecurity/trivy-action@0.33.0
@@ -124,10 +124,25 @@ jobs:
             trivy-app.txt
             trivy-nginx.txt
 
+  ssh-smoketest:
+    name: Test SSH Deploy to Production VM
+    runs-on: ubuntu-latest
+    needs: trivy-scan
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRODUCTION }}
+
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.IP_PRODUCTION }} \
+            "echo ✅ Connected to $(hostname) && docker ps -a || true"
+
   approve-deploy:
     name: Approve Deploy to Production
     runs-on: ubuntu-latest
-    needs: trivy-scan
+    needs: ssh-smoketest
     environment: production
     steps:
       - name: Await manual approval
