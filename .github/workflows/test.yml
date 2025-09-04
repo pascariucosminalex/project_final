@@ -2,7 +2,7 @@ name: Test Pipline
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main" ]
 
 env:
   MONGODB_DB_NAME: db1
