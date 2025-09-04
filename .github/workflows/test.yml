@@ -101,7 +101,7 @@ jobs:
       - name: Trivy scan (app)
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${{ env.TAG }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.test.outputs.short_sha }}
           format: table
           output: trivy-app.txt
           severity: CRITICAL,HIGH
@@ -111,7 +111,7 @@ jobs:
       - name: Trivy scan (nginx)
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ env.TAG }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }}
           format: table
           output: trivy-nginx.txt
           severity: CRITICAL,HIGH
@@ -158,7 +158,7 @@ jobs:
           TAG="${{ needs.test.outputs.short_sha }}"
           if [ -z "$TAG" ]; then
           echo "ℹ️ needs.test.outputs.short_sha e gol; fallback la GITHUB_SHA"
-          TAG="${GITHUB_SHA:0:6}"
+          TAG="${GITHUB_SHA:0:7}"
           fi
           echo "Using TAG: $TAG"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
