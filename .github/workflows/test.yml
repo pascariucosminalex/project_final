@@ -101,7 +101,7 @@ jobs:
       - name: Trivy scan (app)
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${{ needs.test.outputs.short_sha }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/myapp:${{ env.TAG }}
           format: table
           output: trivy-app.txt
           severity: CRITICAL,HIGH
@@ -111,7 +111,7 @@ jobs:
       - name: Trivy scan (nginx)
         uses: aquasecurity/trivy-action@0.33.0
         with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }}
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ env.TAG }}
           format: table
           output: trivy-nginx.txt
           severity: CRITICAL,HIGH
