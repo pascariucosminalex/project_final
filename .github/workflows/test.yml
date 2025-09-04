@@ -80,7 +80,7 @@ jobs:
       - name: Build Nginx Image
         run: |
           docker build -f docker/Dockerfile.nginx \
-            -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }} 
+            -t ${{ secrets.DOCKER_USERNAME }}/mynginx:${{ needs.test.outputs.short_sha }} docker
 
       - name: Push Images
         run: |
