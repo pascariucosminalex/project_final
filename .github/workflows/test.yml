@@ -56,7 +56,7 @@ jobs:
 
       - name: Compute SHORT_SHA
         id: sha
-        run: echo "short_sha=${GITHUB_SHA::6}" >> "$GITHUB_OUTPUT"
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
   docker:
     name: Build & Push Docker Images

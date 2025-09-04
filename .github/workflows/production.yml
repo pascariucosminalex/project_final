@@ -36,7 +36,7 @@ jobs:
             TAG="${{ github.event.inputs.tag }}"
           else
             SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
-            TAG="${SHA::6}"
+            TAG="${SHA::7}"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Using image tag: $TAG"
