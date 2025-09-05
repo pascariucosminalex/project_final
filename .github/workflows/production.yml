@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_run:
-    workflows: ["Test Pipline"]
-    types: [completed]
+
   workflow_dispatch:
     inputs:
       tag:
