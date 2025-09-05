@@ -6,7 +6,7 @@ on:
 
 env:
   MONGODB_DB_NAME: db1
-  PORT: 8080      # ← app rulează pe 8081 acum
+  PORT: 8081    # ← app rulează pe 8081 acum
 
 jobs:
   test:
@@ -193,7 +193,7 @@ jobs:
         run: |
           echo "🔁 Testăm NGINX pe portul "
           sleep 3
-          OUT=$(curl -s -w "\n%{http_code}\n" http://localhost:8080/)
+          OUT=$(curl -s -w "\n%{http_code}\n" http://localhost:$PORT/)
           BODY=$(echo "$OUT" | head -n 1)
           CODE=$(echo "$OUT" | tail -n 1)
 
@@ -201,7 +201,7 @@ jobs:
           echo "Răspuns: $BODY"
 
           if [ "$CODE" != "200" ]; then
-            echo "❌ NGINX nu răspunde corect la http://localhost:8087/"
+            echo "❌ NGINX nu răspunde corect la http://localhost::$PORT/"
             exit 1
           else
             echo "✅ NGINX răspunde corect"
