@@ -27,7 +27,6 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
-    environment: production
 
     steps:
       - name: Decide TAG (SHORT_SHA sau input)
@@ -106,9 +105,8 @@ jobs:
             -e MONGODB_DB_NAME="${MONGODB_DB_NAME}" \
             -e PORT="${APP_PORT}" \
             ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
-            # 👆 Fără -p: app NU e expus public, doar în rețeaua Docker
 
-          echo "== start nginx (:80 -> app:${APP_PORT}) =="
+          echo "== start nginx (:${NGINX_PORT} -> app:${APP_PORT}) =="
           docker run -d --name nginx --restart=always --network appnet \
             -p ${NGINX_PORT}:80 \
             ${DOCKER_USERNAME}/mynginx:${IMAGE_TAG}
