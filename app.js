@@ -1,11 +1,11 @@
 import express from 'express';
 
 const app = express();
-const port = process.env.PORT || 8087;
+const port = process.env.PORT || 8081;  // default 8081
 
 // 🔁 Endpoint principal
 app.get('/', (req, res) => {
-  res.send('salut din pipeline');
+  res.send('salut din pipeline pe 8081 🚀');
 });
 
 // ❤️ Healthcheck (pentru CI/CD, nginx, Docker)

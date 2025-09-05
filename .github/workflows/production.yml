@@ -15,7 +15,7 @@ on:
         type: string
 
 env:
-  APP_PORT: 8080
+  APP_PORT: 8081        
   NGINX_PORT: 8087
   MONGODB_DB_NAME: db1
   MONGODB_CONNECTION_PROTOCOL: mongodb+srv
@@ -99,7 +99,7 @@ jobs:
             if [ -z "${!v:-}" ]; then echo "❌ Missing $v"; exit 1; else echo "✅ $v set"; fi
           done
 
-          echo "== start app (${APP_PORT}) =="
+          echo "== start app (internal:${APP_PORT}) =="
           docker run -d --name app --restart=always --network appnet \
             -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
             -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
@@ -107,10 +107,11 @@ jobs:
             -e MONGODB_CLUSTER_ADDRESS="${MONGODB_CLUSTER_ADDRESS}" \
             -e MONGODB_DB_NAME="${MONGODB_DB_NAME}" \
             -e PORT="${APP_PORT}" \
-            -p ${APP_PORT}:${APP_PORT} \
             ${DOCKER_USERNAME}/myapp:${IMAGE_TAG}
+            # 👆 Fără -p: app NU e expus public, doar în rețeaua Docker
 
           echo "== start nginx (:80 -> app:${APP_PORT}) =="
           docker run -d --name nginx --restart=always --network appnet \
             -p ${NGINX_PORT}:80 \
             ${DOCKER_USERNAME}/mynginx:${IMAGE_TAG}
+          EOF

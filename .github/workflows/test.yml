@@ -6,7 +6,7 @@ on:
 
 env:
   MONGODB_DB_NAME: db1
-  PORT: 8080
+  PORT: 8081   # ← app rulează pe 8081 acum
 
 jobs:
   test:
@@ -175,6 +175,7 @@ jobs:
         run: |
           docker network create appnet || true
 
+          # app DOAR în rețea, fără expunere externă; rulează pe 8081
           docker run -d --name app --network appnet \
             -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
             -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
@@ -182,16 +183,16 @@ jobs:
             -e MONGODB_CLUSTER_ADDRESS="${MONGODB_CLUSTER_ADDRESS}" \
             -e MONGODB_DB_NAME='${{ env.MONGODB_DB_NAME }}' \
             -e PORT='${{ env.PORT }}' \
-            -p 8080:8080 \
             ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
 
+          # nginx expus pe 8087 → proxy către app:8081
           docker run -d --name nginx --network appnet \
             -p 8087:80 \
             ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
 
       - name: Test NGINX reverse proxy
         run: |
-          echo "🔁 Testăm NGINX pe portul 8087 (proxy către app:8080)"
+          echo "🔁 Testăm NGINX pe portul 8087 (proxy către app:8081)"
           sleep 3
           OUT=$(curl -s -w "\n%{http_code}\n" http://localhost:8087/)
           BODY=$(echo "$OUT" | head -n 1)
