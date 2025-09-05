@@ -175,7 +175,7 @@ jobs:
         run: |
           docker network create appnet || true
 
-          # app DOAR în rețea, fără expunere externă; rulează pe 8081
+        
           docker run -d --name app --network appnet \
             -e MONGODB_CONNECTION_PROTOCOL="${MONGODB_CONNECTION_PROTOCOL}" \
             -e MONGODB_USERNAME="${MONGODB_USERNAME}" \
@@ -185,9 +185,8 @@ jobs:
             -e PORT='${{ env.PORT }}' \
             ${{ secrets.DOCKER_USERNAME }}/myapp:${TAG}
 
-          # nginx expus pe 8087 → proxy către app:8081
           docker run -d --name nginx --network appnet \
-            -p 8087:80 \
+            -p ${PORT}:80 \
             ${{ secrets.DOCKER_USERNAME }}/mynginx:${TAG}
 
       - name: Test NGINX reverse proxy
