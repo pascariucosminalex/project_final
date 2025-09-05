@@ -1,7 +1,7 @@
 import express from 'express';
 
 const app = express();
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 8087;
 
 // 🔁 Endpoint principal
 app.get('/', (req, res) => {
