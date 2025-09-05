@@ -6,7 +6,7 @@ on:
 
 env:
   MONGODB_DB_NAME: db1
-  PORT: 8081   # ← app rulează pe 8081 acum
+  PORT: 8080      # ← app rulează pe 8081 acum
 
 jobs:
   test:
@@ -192,9 +192,9 @@ jobs:
 
       - name: Test NGINX reverse proxy
         run: |
-          echo "🔁 Testăm NGINX pe portul 8087 (proxy către app:8081)"
+          echo "🔁 Testăm NGINX pe portul "
           sleep 3
-          OUT=$(curl -s -w "\n%{http_code}\n" http://localhost:8087/)
+          OUT=$(curl -s -w "\n%{http_code}\n" http://localhost:8080/)
           BODY=$(echo "$OUT" | head -n 1)
           CODE=$(echo "$OUT" | tail -n 1)
 
