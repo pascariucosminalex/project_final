@@ -191,7 +191,7 @@ jobs:
 
       - name: Test NGINX reverse proxy
         run: |
-          echo "🔁 Testăm NGINX pe portul "
+          echo "🔁 Testăm NGINX  "
           sleep 3
           OUT=$(curl -s -w "\n%{http_code}\n" http://localhost:$PORT/)
           BODY=$(echo "$OUT" | head -n 1)
